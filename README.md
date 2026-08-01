@@ -11,14 +11,28 @@ Cloudflare 原生的 Budget alerts 只发邮件，官方文档明确写着 *do n
 
 1. 经 GraphQL Analytics API 采集 Workers / R2 / Durable Objects / KV / D1 的用量
 2. 按官方价格表扣除免费额度后折算成美元
-3. 任一产品超过其阈值 → 断流，并发通知
+3. 某个产品超过它自己的预算 → 执行该产品对应的处置，并发通知
 
-断流动作只有两个，都可逆，且执行前先把原状态快照进 KV：
+处置按产品分派，不是一处超标就全账户熄火：
 
-- 每个 zone 上启用一条 `block` 规则（规则由本工具创建，默认停用）
-- 清空所有 Worker 的 cron schedules（守卫自身除外）
+| 超标产品 | 动作 |
+| :--- | :--- |
+| **R2** | 关掉公开访问开关：`r2.dev` 托管域 + bucket 自定义域。**对象与桶一律不碰** |
+| 其它 | 每个 zone 启用一条 `block` 规则 + 清空所有 Worker 的 cron schedules |
 
-**不删** route、**不删**自定义域、**不改** R2 桶配置。
+只有 R2 超标时不会牵连站点和定时任务；反之亦然。所有动作都可逆，执行前先把原状态
+快照进 KV。
+
+### 永不删除数据是机制保证的，不是靠自觉
+
+所有对外调用都要先过 `src/allowlist.js` 的白名单闸门，不在册的方法+路径直接抛错拒发：
+
+- `DELETE` 无条件拒绝
+- 触碰 `/objects` 的路径拒绝
+- 触碰 `/lifecycle` 的路径拒绝（改生命周期规则会级联删对象）
+
+用白名单而非黑名单，是因为黑名单漏一条就破功，白名单漏一条只是少个功能。测试里对此
+有可执行断言。
 
 ## 部署
 
@@ -98,9 +112,10 @@ curl -X POST https://<your-worker-host>/restore -H "x-guard-secret: $SECRET"
 - **估算不等于账单。** 唯一可程序化读取的用量源是 GraphQL Analytics，Cloudflare 明确
   声明该数据不应用作计费依据（计费会排除 DDoS 流量等）。Billable Usage 面板数据准确，
   但目前没有导出 API。
-- **开了 `r2.dev` 的公开桶拦不住。** 该托管子域不在自有 zone 上，WAF 规则覆盖不到；
-  要挡只能关掉公开访问开关，那属于本工具刻意排除的「删」类动作。走自定义域暴露的桶
-  不受此限，WAF 规则能覆盖。
+- **预签名 URL 可能仍然有效。** 关闭公开访问开关拦不住已经签发出去的 URL，它们会继续
+  产生 Class B 计费直到过期。
+- **走 Worker 绑定读取 R2 不受 R2 处置影响**，那条路径由 Worker 侧的断流覆盖 —— 也就是
+  说只有 R2 超标、Worker 没超标时，经 Worker 代理的读取仍然通。
 - **Durable Object alarm 停不掉。** 没有任何外部 API 能取消他人 DO 的 alarm。要兜住
   这条，只能在 DO 代码里开工前自行读取一个 killswitch 后 `deleteAlarm()`。
 - **Container 与 Workflow 不受断流影响。** 它们不靠入站请求驱动，需要另行处理。

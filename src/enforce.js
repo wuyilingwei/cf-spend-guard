@@ -1,6 +1,9 @@
-// 「只断不删」：仅新增/启用一条 WAF block 规则，并清空 cron schedules。
-// 两者都可逆，且执行前把原状态快照进 KV，恢复即回放。
-// 不删 route、不删自定义域、不改 R2 桶配置。
+// 「只断不删」。按超标产品分派动作，不是一处超标全账户熄火：
+//   R2 超标      → 关掉公开访问开关（r2.dev 托管域 + 自定义域），对象一律不碰
+//   其它产品超标 → 启用 WAF block 规则 + 清空 cron schedules
+// 全部动作都可逆，执行前把原状态快照进 KV，恢复即回放。
+
+import { cutExternalAccess, restoreExternalAccess } from './r2access.js';
 
 const RULE_TAG = 'cf-spend-guard:block';
 const WAF_PHASE = 'http_request_firewall_custom';
@@ -17,10 +20,26 @@ export async function writeState(kv, state) {
 
 /**
  * 跳闸。先存快照再动手，任一子步骤失败不阻断其余步骤，最终汇总结果。
+ * @param exceeded 超标产品名集合；决定执行哪些动作
  */
-export async function trip(api, kv, config, reason) {
-  const snapshot = { at: new Date().toISOString(), crons: {}, zones: [] };
+export async function trip(api, kv, config, reason, exceeded = new Set()) {
+  const snapshot = { at: new Date().toISOString(), crons: {}, zones: [], r2: null };
   const actions = [];
+
+  // R2 单独预算：只中断外部访问，永不删除文件
+  if (exceeded.has('r2')) {
+    const r2 = await cutExternalAccess(api);
+    snapshot.r2 = r2.snapshot;
+    actions.push(...r2.actions);
+  }
+
+  // 其余产品超标才动 Worker 与 zone；只有 R2 超标时不牵连站点
+  const cutCompute = [...exceeded].some((p) => p !== 'r2');
+  if (!cutCompute) {
+    await kv.put(KEY_SNAPSHOT, JSON.stringify(snapshot));
+    await writeState(kv, { tripped: true, at: snapshot.at, reason, scope: ['r2'] });
+    return { snapshot, actions };
+  }
 
   const scripts = await listScripts(api);
   for (const name of scripts) {
@@ -66,6 +85,11 @@ export async function restore(api, kv) {
   const snapshot = await kv.get(KEY_SNAPSHOT, 'json');
   if (!snapshot) throw new Error('no snapshot to restore from');
   const actions = [];
+
+  if (snapshot.r2) {
+    const r2 = await restoreExternalAccess(api, snapshot.r2);
+    actions.push(...r2.actions);
+  }
 
   for (const [name, schedules] of Object.entries(snapshot.crons ?? {})) {
     if (!schedules?.length) continue;

@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cf-spend-guard",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+
+  // 每 10 分钟一轮。GraphQL 数据本身有分钟级延迟，更密没有意义
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+
+  "kv_namespaces": [
+    { "binding": "STATE", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }
+  ],
+
+  "vars": {
+    // dry-run 只估算与通知，armed 才真正断流。上线后先跑 dry-run 观察
+    "MODE": "dry-run",
+    "BILLING_CYCLE_START_DAY": "1",
+    // 每个产品各自的美元预算。R2 超标只关公开访问开关，其它产品超标才断站点与 cron
+    "THRESHOLDS_USD": "{\"workers\":5,\"r2\":5,\"durable_objects\":5,\"kv\":2,\"d1\":2}",
+    // 额外豁免的 Worker 名（守卫自身永远豁免，无需列出）
+    "EXEMPT_SCRIPTS": "",
+    // 探针取不到数时是否跳闸。默认否，避免数据源故障造成误杀
+    "TRIP_ON_UNKNOWN": "false"
+  }
+
+  // 需用 wrangler secret put 配置：
+  //   CF_API_TOKEN    权限：Account Analytics 读、Workers Scripts 编辑、Zone WAF 编辑
+  //   CF_ACCOUNT_ID
+  //   RESTORE_SECRET  调用恢复端点所需
+  //   ALERT_WEBHOOK   可选，通知投递地址
+}

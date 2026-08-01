@@ -64,7 +64,12 @@ export async function runCheck(env, { evaluateOnly = false } = {}) {
     return report;
   }
 
-  const result = await trip(api, env.STATE, config, verdict.reason);
+  const exceeded = new Set(
+    Object.entries(verdict.products)
+      .filter(([, p]) => p.exceeded)
+      .map(([name]) => name),
+  );
+  const result = await trip(api, env.STATE, config, verdict.reason, exceeded);
   report.event = 'tripped';
   report.actions = result.actions;
   await notify(config.alertWebhook, report);
@@ -82,7 +87,14 @@ export function evaluate(usage, config) {
   for (const [product, limit] of Object.entries(config.thresholds)) {
     const probe = usage[product];
     if (!probe || probe.status !== 'ok') {
-      products[product] = { status: 'unknown', limit, note: probe?.note ?? 'no data' };
+      // exceeded 同时是「该产品要不要执行动作」的依据，取数失败按配置一并标上，
+      // 否则会出现标记已跳闸、实际一个动作都没执行的空转
+      products[product] = {
+        status: 'unknown',
+        limit,
+        exceeded: config.tripOnUnknown,
+        note: probe?.note ?? 'no data',
+      };
       if (config.tripOnUnknown) exceeded.push(`${product} 取数失败且已配置为按超标处理`);
       continue;
     }

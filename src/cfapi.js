@@ -1,3 +1,5 @@
+import { assertAllowed } from './allowlist.js';
+
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const GRAPHQL_URL = `${API_BASE}/graphql`;
 const TIMEOUT_MS = 20_000;
@@ -11,6 +13,7 @@ export class CloudflareApi {
   }
 
   async rest(path, { method = 'GET', body } = {}) {
+    assertAllowed(method, path);
     const res = await this.#fetch(`${API_BASE}${path}`, {
       method,
       headers: this.#headers(),
