@@ -36,7 +36,11 @@ const ALLOWED = [
 const NEVER = [
   { re: /^\/accounts\/[^/]+\/r2\/buckets\/[^/]+\/objects/, why: '触碰 R2 对象' },
   { re: /^\/accounts\/[^/]+\/r2\/buckets\/[^/]+\/lifecycle/, why: '改生命周期规则会级联删除对象' },
+  { re: /^\/accounts\/[^/]+\/r2\/buckets\/[^/]+\/lock/, why: '桶锁是防删防覆盖的最后护栏，不得触碰' },
   { re: /^\/accounts\/[^/]+\/r2\/buckets\/[^/]+\/sippy/, why: '改变数据来源语义' },
+  { re: /^\/accounts\/[^/]+\/r2-catalog\//, why: 'catalog 维护配置会重写并删除数据文件' },
+  { re: /^\/accounts\/[^/]+\/r2\/temp-access-credentials/, why: '会把删除权限外发' },
+  { re: /^\/accounts\/[^/]+\/slurper\//, why: '迁移作业默认覆盖目标桶同名对象' },
 ];
 
 export class BlockedCallError extends Error {

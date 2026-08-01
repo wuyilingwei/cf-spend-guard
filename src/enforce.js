@@ -28,7 +28,7 @@ export async function trip(api, kv, config, reason, exceeded = new Set()) {
 
   // R2 单独预算：只中断外部访问，永不删除文件
   if (exceeded.has('r2')) {
-    const r2 = await cutExternalAccess(api);
+    const r2 = await cutExternalAccess(api, { only: config.r2Buckets });
     snapshot.r2 = r2.snapshot;
     actions.push(...r2.actions);
   }

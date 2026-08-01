@@ -23,6 +23,8 @@
     "THRESHOLDS_USD": "{\"workers\":5,\"r2\":5,\"durable_objects\":5,\"kv\":2,\"d1\":2}",
     // 额外豁免的 Worker 名（守卫自身永远豁免，无需列出）
     "EXEMPT_SCRIPTS": "",
+    // R2 预算覆盖哪些桶，逗号分隔。留空=账户下全部桶，会误伤无关项目，建议显式列出
+    "R2_BUCKETS": "",
     // 探针取不到数时是否跳闸。默认否，避免数据源故障造成误杀
     "TRIP_ON_UNKNOWN": "false"
   }

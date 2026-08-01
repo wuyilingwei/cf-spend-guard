@@ -30,6 +30,14 @@ export function loadConfig(env, now = new Date()) {
     mode,
     thresholds,
     exemptScripts: exempt,
+    // 留空表示账户下全部桶。账户级预算触发却关掉全账户的桶会误伤无关项目，
+    // 建议显式列出本预算真正覆盖的桶
+    r2Buckets: new Set(
+      String(env.R2_BUCKETS ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
     tripOnUnknown: env.TRIP_ON_UNKNOWN === 'true',
     restoreSecret: env.RESTORE_SECRET ?? '',
     alertWebhook: env.ALERT_WEBHOOK ?? '',

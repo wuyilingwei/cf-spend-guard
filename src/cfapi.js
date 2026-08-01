@@ -12,11 +12,11 @@ export class CloudflareApi {
     this.accountId = accountId;
   }
 
-  async rest(path, { method = 'GET', body } = {}) {
+  async rest(path, { method = 'GET', body, headers } = {}) {
     assertAllowed(method, path);
     const res = await this.#fetch(`${API_BASE}${path}`, {
       method,
-      headers: this.#headers(),
+      headers: { ...this.#headers(), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const json = await res.json().catch(() => null);
