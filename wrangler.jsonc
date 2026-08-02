@@ -19,8 +19,9 @@
     // dry-run 只估算与通知，armed 才真正断流。上线后先跑 dry-run 观察
     "MODE": "dry-run",
     "BILLING_CYCLE_START_DAY": "1",
-    // 每个产品各自的美元预算。R2 超标只关公开访问开关，其它产品超标才断站点与 cron
-    "THRESHOLDS_USD": "{\"workers\":5,\"r2\":5,\"durable_objects\":5,\"kv\":2,\"d1\":2}",
+    // 每个产品各自的美元预算。R2 超标只关公开访问开关，其它产品超标才断站点与 cron。
+    // DO 收得比 Workers 紧：duration 是最容易失控的计费项
+    "THRESHOLDS_USD": "{\"workers\":10,\"r2\":10,\"durable_objects\":5,\"kv\":2,\"d1\":2}",
     // 额外豁免的 Worker 名（守卫自身永远豁免，无需列出）
     "EXEMPT_SCRIPTS": "",
     // R2 预算覆盖哪些桶，逗号分隔。留空=账户下全部桶，会误伤无关项目，建议显式列出

@@ -50,11 +50,14 @@ R2 这一路有两个细节值得说明：
 npm install
 ```
 
-建 KV 命名空间，把返回的 id 填进 `wrangler.jsonc`：
+建 KV 命名空间：
 
 ```bash
 npx wrangler kv namespace create STATE
 ```
+
+仓库里的 `wrangler.jsonc` 保留占位 id。账户 id 与命名空间 id 不入库，另建一份
+`wrangler.local.jsonc`（已被忽略）填真实值，部署时用 `-c` 指定它。
 
 配置密钥。API Token 需要三项权限：Account Analytics 读、Workers Scripts 编辑、Zone WAF 编辑。
 
@@ -79,7 +82,7 @@ npx wrangler secret put ALERT_WEBHOOK
 部署：
 
 ```bash
-npx wrangler deploy
+npx wrangler deploy -c wrangler.local.jsonc
 ```
 
 ## 上线顺序
